@@ -61,6 +61,16 @@ Docker will automatically create volumes to persist your settings, alert history
 - `nvr_data`: Persists `settings.json`, `rois.json`, `alerts_history.json`, etc.
 - `nvr_clips`: Persists saved video clips in `public/clips`.
 
+**Troubleshooting & Maintenance:**
+- **View logs:** `docker logs -f direct-nvr-viewer`
+- **Restart:** `docker compose restart`
+- **Full Reset (Wipes all settings & credentials):**
+  If you want to perform a truly clean install and wipe all persisted settings from the Docker volumes:
+  ```bash
+  docker compose down -v
+  docker compose up -d --build
+  ```
+
 ---
 
 ## 📐 Dynamic Frigate Integration (MQTT & API)
