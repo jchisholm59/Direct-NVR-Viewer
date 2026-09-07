@@ -7,15 +7,12 @@ services:
     privileged: true
     environment:
       - PORT=3010
-      - FRIGATE_CONFIG_PATH=/app/config/config.yml
       - DATA_DIR=/app/data
       # - GEMINI_API_KEY=your-api-key-here
     volumes:
-      # Map your Frigate config file here
-      - /Users/jim/config.yml:/app/config/config.yml:ro
       # Persist clips
       - nvr_clips:/app/public/clips
-      # Persist configuration files (optional: could also mount individual files)
+      # Persist configuration files
       - nvr_data:/app/data
     env_file:
       - .env

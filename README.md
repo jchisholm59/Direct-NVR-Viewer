@@ -49,17 +49,12 @@ You can also run Direct-NVR-Viewer using Docker, which is the recommended way fo
 
 **Quick Start:**
 1.  **Configure environment:** Create a `.env` file (you can use `.env.example` as a template) and add your `GEMINI_API_KEY`.
-2.  **Mount your Frigate config:** In `docker-compose.yml`, ensure the volume mount for your `config.yml` is correct:
-    ```yaml
-    volumes:
-      - /path/to/your/frigate/config.yml:/app/config/config.yml:ro
-    ```
-3.  **Start the container:**
+2.  **Start the container:**
     ```bash
     docker compose up -d
     ```
 
-The application will be available at `http://localhost:3010`.
+The application will be available at `http://localhost:3010`. The app will automatically attempt to discover your Frigate instance on the network.
 
 **Persistent Data:**
 Docker will automatically create volumes to persist your settings, alert history, and event clips:

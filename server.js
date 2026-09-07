@@ -305,7 +305,7 @@ async function discoverFrigateIP() {
 // Helper to parse Frigate configuration and resolve camera direct RTSP streams
 function parseFrigateConfig() {
   if (!fs.existsSync(FRIGATE_CONFIG_PATH)) {
-    console.error(`Frigate config not found at ${FRIGATE_CONFIG_PATH}`);
+    console.log(`[CONFIG] Optional fallback config file not found at ${FRIGATE_CONFIG_PATH}. Using dynamic API discovery.`);
     return;
   }
 
