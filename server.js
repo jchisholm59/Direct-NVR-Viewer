@@ -108,12 +108,13 @@ app.use(express.text({ type: ['application/sdp', 'text/plain'] }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Configuration Paths
-const FRIGATE_CONFIG_PATH = '/Users/jim/config.yml';
-const ROIS_FILE_PATH = path.join(__dirname, 'rois.json');
-const EXCLUSIONS_FILE_PATH = path.join(__dirname, 'exclusions.json');
-const DETECTIONS_STATE_PATH = path.join(__dirname, 'detections_state.json');
-const SETTINGS_FILE_PATH = path.join(__dirname, 'settings.json');
-const ALERTS_HISTORY_PATH = path.join(__dirname, 'alerts_history.json');
+const FRIGATE_CONFIG_PATH = process.env.FRIGATE_CONFIG_PATH || '/Users/jim/config.yml';
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+const ROIS_FILE_PATH = path.join(DATA_DIR, 'rois.json');
+const EXCLUSIONS_FILE_PATH = path.join(DATA_DIR, 'exclusions.json');
+const DETECTIONS_STATE_PATH = path.join(DATA_DIR, 'detections_state.json');
+const SETTINGS_FILE_PATH = path.join(DATA_DIR, 'settings.json');
+const ALERTS_HISTORY_PATH = path.join(DATA_DIR, 'alerts_history.json');
 const CLIPS_DIR = path.join(__dirname, 'public', 'clips');
 
 // Auto-create clips folder if it does not exist

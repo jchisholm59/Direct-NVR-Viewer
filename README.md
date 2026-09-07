@@ -44,6 +44,28 @@ To stop the server easily at any time, run:
 npm stop
 ```
 
+### 3. Running with Docker
+You can also run Direct-NVR-Viewer using Docker, which is the recommended way for production deployment.
+
+**Quick Start:**
+1.  **Configure environment:** Create a `.env` file (you can use `.env.example` as a template) and add your `GEMINI_API_KEY`.
+2.  **Mount your Frigate config:** In `docker-compose.yml`, ensure the volume mount for your `config.yml` is correct:
+    ```yaml
+    volumes:
+      - /path/to/your/frigate/config.yml:/app/config/config.yml:ro
+    ```
+3.  **Start the container:**
+    ```bash
+    docker compose up -d
+    ```
+
+The application will be available at `http://localhost:3010`.
+
+**Persistent Data:**
+Docker will automatically create volumes to persist your settings, alert history, and event clips:
+- `nvr_data`: Persists `settings.json`, `rois.json`, `alerts_history.json`, etc.
+- `nvr_clips`: Persists saved video clips in `public/clips`.
+
 ---
 
 ## 📐 Dynamic Frigate Integration (MQTT & API)
