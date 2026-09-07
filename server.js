@@ -107,6 +107,25 @@ async function performAiQuery(prompt, isJson = true) {
 app.use(express.text({ type: ['application/sdp', 'text/plain'] }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Explicitly serve index.html for the root route
+app.get('/', (req, res) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  console.log(`[HTTP] Serving root from: ${indexPath}`);
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    console.error(`[ERROR] index.html not found at ${indexPath}`);
+    // List directory to help debugging
+    try {
+      const files = fs.readdirSync(path.join(__dirname, 'public'));
+      console.log(`[DEBUG] Files in public directory: ${files.join(', ')}`);
+    } catch (err) {
+      console.error(`[DEBUG] Could not read public directory: ${err.message}`);
+    }
+    res.status(404).send(`index.html not found at ${indexPath}. See server logs for details.`);
+  }
+});
+
 // Configuration Paths
 const FRIGATE_CONFIG_PATH = process.env.FRIGATE_CONFIG_PATH || '/Users/jim/config.yml';
 const DATA_DIR = process.env.DATA_DIR || __dirname;
