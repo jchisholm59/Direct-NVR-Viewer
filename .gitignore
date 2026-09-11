@@ -12,3 +12,4 @@ nohup.out
 *.idea
 **/android/.idea/
 *.zip
+tmp_transcode/

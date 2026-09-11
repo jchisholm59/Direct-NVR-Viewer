@@ -825,39 +825,97 @@ app.get('/api/stream/:cameraName', (req, res) => {
   proxyReq.end();
 });
 
-// Same-Origin Dynamic Event Video Clip Proxy to bypass browser cross-origin blocks and support HTTP 206 Range requests
+// Same-Origin Dynamic Event Video Clip Proxy to bypass browser cross-origin blocks.
+// Frigate serves H.265 (HEVC) clips as-is, and Chrome/Firefox/most Android WebViews
+// cannot decode H.265 at all (only Safari/iOS/macOS can, and even then only via hvc1
+// boxes - see HevcPatchStream above). So every requested clip is transcoded on-demand
+// to H.264/AAC via ffmpeg before being served, which makes it playable in any browser
+// regardless of source camera codec. H.264-native clips are transcoded too, for a
+// single simple code path - the extra cost is negligible for a ~10s clip. The clip is
+// written to a temp file (not piped straight through) so ffmpeg can produce a proper
+// faststart mp4 with a known Content-Length, and so the browser gets full HTTP Range
+// support (via res.sendFile) for scrubbing/seeking once it's ready.
 app.get('/api/events/:eventId/clip.mp4', (req, res) => {
   const { eventId } = req.params;
   const frigateIP = settings.go2rtcHost || '192.168.2.210';
   const url = `http://${frigateIP}:5000/api/events/${eventId}/clip.mp4`;
 
-  console.log(`[CLIP PROXY] Proxying same-origin dynamic video clip for event ${eventId}...`);
+  console.log(`[CLIP PROXY] Fetching + transcoding video clip for event ${eventId}...`);
 
-  // Build the HTTP request options forwarding browser range headers if any (critical for Safari/iOS HTML5 playback)
-  const options = {
-    method: 'GET',
-    headers: {}
-  };
-  if (req.headers.range) {
-    options.headers.range = req.headers.range;
+  const tmpDir = path.join(__dirname, 'tmp_transcode');
+  try {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  } catch (e) {
+    console.error('[CLIP PROXY] Failed to create tmp_transcode dir:', e.message);
   }
+  const tmpFile = path.join(tmpDir, `${eventId}-${Date.now()}-${Math.floor(Math.random() * 1e6)}.mp4`);
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    fs.unlink(tmpFile, () => {});
+  };
 
-  const proxyReq = http.request(url, options, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    if (proxyRes.statusCode === 200 || proxyRes.statusCode === 206) {
-      proxyRes.pipe(new HevcPatchStream()).pipe(res);
-    } else {
-      proxyRes.pipe(res);
+  // Fetch the FULL clip from Frigate (no Range forwarding) - the whole source is
+  // needed to transcode; the browser's own Range requests are served afterwards
+  // straight from our completed, seekable output file.
+  const proxyReq = http.request(url, (proxyRes) => {
+    if (proxyRes.statusCode !== 200) {
+      res.status(proxyRes.statusCode).send(`Frigate returned ${proxyRes.statusCode} for event ${eventId}`);
+      proxyRes.resume();
+      return;
     }
+
+    const ffmpeg = spawn('ffmpeg', [
+      '-y',
+      '-i', 'pipe:0',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '23',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-movflags', '+faststart',
+      '-f', 'mp4',
+      tmpFile,
+    ]);
+
+    let ffmpegErr = '';
+    ffmpeg.stderr.on('data', (d) => { ffmpegErr += d.toString(); });
+
+    proxyRes.pipe(ffmpeg.stdin);
+    proxyRes.on('error', (err) => {
+      console.error(`[CLIP PROXY] Frigate stream error for event ${eventId}:`, err.message);
+      ffmpeg.kill('SIGKILL');
+    });
+
+    ffmpeg.on('error', (err) => {
+      console.error(`[CLIP PROXY] Failed to launch ffmpeg for event ${eventId}:`, err.message);
+      if (!res.headersSent) res.status(500).send('Transcode failed to start (is ffmpeg installed?)');
+      cleanup();
+    });
+
+    ffmpeg.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`[CLIP PROXY] ffmpeg exited ${code} for event ${eventId}: ${ffmpegErr.slice(-500)}`);
+        if (!res.headersSent) res.status(500).send('Video transcode failed');
+        cleanup();
+        return;
+      }
+      res.sendFile(tmpFile, { headers: { 'Content-Type': 'video/mp4', 'Cache-Control': 'no-store' } }, (err) => {
+        if (err) console.error(`[CLIP PROXY] Failed sending transcoded clip for event ${eventId}:`, err.message);
+        cleanup();
+      });
+    });
+
+    req.on('close', () => {
+      if (!res.writableEnded) ffmpeg.kill('SIGKILL');
+    });
   });
 
   proxyReq.on('error', (err) => {
-    console.error(`[CLIP PROXY ERROR] Failed to stream video clip for event ${eventId}:`, err.message);
-    res.status(500).send('Video clip proxy failed');
-  });
-
-  req.on('close', () => {
-    proxyReq.destroy();
+    console.error(`[CLIP PROXY ERROR] Failed to fetch video clip for event ${eventId}:`, err.message);
+    if (!res.headersSent) res.status(500).send('Video clip proxy failed');
   });
 
   proxyReq.end();
